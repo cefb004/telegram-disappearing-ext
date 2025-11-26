@@ -1,7 +1,5 @@
 /* ========================= inject.js ========================= */
-// This file runs in page context (so it has access to the page's window and DOM
-// as if it were part of the page). It exposes a global function `sendSelfDestruct`
-// that you can call from the Console: sendSelfDestruct(imageUrlOrDataUrl, seconds)
+// Updated for Telegram Web A modern layout
 
 (function () {
   if (window.__tg_selfdestruct_installed) return;
@@ -10,7 +8,6 @@
   console.log('[EXT inject] Self-destruct helper installed.');
   console.log("Usage: sendSelfDestruct(imageUrlOrDataUrl, seconds)\nExample: sendSelfDestruct('https://example.com/pic.jpg', 5)");
 
-  // Default style for our fake message bubble (keeps visual separation)
   const STYLE_ID = 'tg-selfdestruct-style-v1';
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
@@ -25,44 +22,34 @@
     document.head.appendChild(style);
   }
 
-  // Utility: find the chat messages container. Telegram Web often uses
-  // a div with role='log' or with a class containing 'chat' or 'message-list'.
+  // ==================== Find messages container ====================
   function findMessagesContainer() {
-    // Try several heuristics (may need adjustment for Web A specifics)
-    const candidates = [
-      "[role='log']",
-      "[data-testid='message-list']",
-      ".messages-wrapper",
-      ".im_history_messages_peer" // older selectors
-    ];
-    for (const sel of candidates) {
-      const el = document.querySelector(sel);
-      if (el) return el;
-    }
+    // Preferential selector for Telegram Web A
+    let container = document.querySelector('.MessageList .messages-container');
+    if (container) return container;
 
-    // fallback: try to find an element that looks like a message area by heuristics
+    // Fallback generic
+    container = document.querySelector('.messages-container');
+    if (container) return container;
+
+    // Fallback by heuristics
     const divs = Array.from(document.querySelectorAll('div'));
     for (const d of divs) {
-      // quick heuristic: many children and contains at least one <img>
       if (d.children.length > 5 && d.querySelector && d.querySelector('img')) return d;
     }
+
+    console.warn('[EXT inject] Could not find messages container — Telegram Web layout may have changed.');
     return null;
   }
 
-  // Creates and inserts a fake outgoing message with the image and timer.
-  // imageSrc can be a remote URL or a data URL.
+  // ==================== Insert timed image ====================
   function insertTimedImage(imageSrc, seconds) {
     const container = findMessagesContainer();
-    if (!container) {
-      console.warn('[EXT inject] Could not find messages container. You may need to adapt selectors for Telegram Web A.');
-      return null;
-    }
+    if (!container) return null;
 
-    // Create message wrapper
     const wrapper = document.createElement('div');
     wrapper.className = 'tg-sd-msg';
 
-    // Image + overlay
     const overlay = document.createElement('div');
     overlay.className = 'tg-sd-overlay';
 
@@ -79,15 +66,13 @@
     overlay.appendChild(timerBadge);
     wrapper.appendChild(overlay);
 
-    // Insert into DOM: append at the end of container so it looks like a new message.
-    // We try to scroll into view after insertion.
     container.appendChild(wrapper);
     wrapper.scrollIntoView({behavior: 'smooth', block: 'end'});
 
     return { wrapper, img, timerBadge };
   }
 
-  // Exposed global function
+  // ==================== Global exposed functions ====================
   window.sendSelfDestruct = async function (imageSrcOrDataUrl, seconds = 5) {
     if (!imageSrcOrDataUrl) {
       console.error('sendSelfDestruct requires an image URL or data URL as first arg');
@@ -102,44 +87,28 @@
     const { wrapper, timerBadge } = inserted;
     let remaining = seconds;
 
-    // Update UI every second
     const intervalId = setInterval(() => {
       remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(intervalId);
-      }
+      if (remaining <= 0) clearInterval(intervalId);
       timerBadge.textContent = `${Math.max(0, remaining)}s`;
     }, 1000);
 
-    // After TTL, remove image and replace with "destroyed" note
     setTimeout(() => {
-      // smooth fade-out
       wrapper.style.transition = 'opacity 300ms ease-out, height 300ms ease-out';
       wrapper.style.opacity = '0.0';
-      // after transition remove/replace
       setTimeout(() => {
         const destroyed = document.createElement('div');
         destroyed.className = 'tg-sd-destroyed';
         destroyed.textContent = 'Esta foto foi destruída.';
-        try {
-          wrapper.replaceWith(destroyed);
-        } catch (e) {
-          // fallback: remove
-          wrapper.remove();
-        }
-        // notify extension background (optional)
-        try {
-          window.postMessage({ type: 'TG_SD_DESTROYED' }, '*');
-        } catch (e) {}
+        try { wrapper.replaceWith(destroyed); } catch(e) { wrapper.remove(); }
+        try { window.postMessage({ type: 'TG_SD_DESTROYED' }, '*'); } catch(e) {}
       }, 300);
     }, seconds * 1000);
 
     return true;
   };
 
-  // Optional utility: convenience to send a data URL from a file picked via a prompt
   window.sendSelfDestructFromFile = async function (seconds = 5) {
-    // Create hidden input
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -148,10 +117,7 @@
 
     input.onchange = async (ev) => {
       const file = input.files && input.files[0];
-      if (!file) {
-        input.remove();
-        return;
-      }
+      if (!file) { input.remove(); return; }
       const reader = new FileReader();
       reader.onload = function (e) {
         const dataUrl = e.target.result;
@@ -164,7 +130,7 @@
     input.click();
   };
 
-  // Listen for messages from content/background if you want features like "clear all"
+  // ==================== Message listener for clearing ====================
   window.addEventListener('message', (ev) => {
     const msg = ev.data;
     if (!msg || typeof msg !== 'object') return;
@@ -174,3 +140,4 @@
     }
   });
 })();
+
