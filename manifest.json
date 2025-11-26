@@ -1,25 +1,23 @@
 {
-  "name": "AI Stealth: Take Home Challenge",
-  "version": "1.0",
-  "manifest_version": 3,
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://web.telegram.org/*"],
-      "js": ["content.js"],
-      "run_at": "document_start"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["inject.js"],
-      "matches": ["https://web.telegram.org/*"]
-    }
-  ],
-  "permissions": [],
-  "host_permissions": ["https://web.telegram.org/*"]
+"manifest_version": 3,
+"name": "Telegram Web A - SelfDestruct Simulator",
+"version": "1.0",
+"description": "Simula fotos autodestrutivas no Telegram Web A via extensão (apenas visual/local).",
+"permissions": ["storage", "scripting", "activeTab"],
+"background": {
+"service_worker": "background.js"
+},
+"content_scripts": [
+{
+"matches": ["https://web.telegram.org/*"],
+"js": ["content.js"],
+"run_at": "document_idle"
 }
-
+],
+"web_accessible_resources": [
+{
+"resources": ["inject.js"],
+"matches": ["https://web.telegram.org/*"]
+}
+]
+}

@@ -1,30 +1,34 @@
-console.log("[ext] content script loaded");
+/* ========================= content.js ========================= */
+// Injects inject.js into the page context so functions live on window and
+// can be executed directly from the Console (F12). This keeps our logic
+// running as if it were part of the Telegram Web page.
 
-function injectNow() {
-  const s = document.createElement("script");
-  s.src = chrome.runtime.getURL("inject.js");
-  s.setAttribute("data-injected-by", "tg-ext");
-  s.onload = () => {
-    console.log("[ext] inject.js injected (stable)");
-  };
-  (document.head || document.documentElement).appendChild(s);
+
+(function () {
+try {
+const script = document.createElement('script');
+script.src = chrome.runtime.getURL('inject.js');
+script.id = 'tg-selfdestruct-injector';
+script.onload = function () {
+console.log('[EXT] inject.js loaded');
+this.remove(); // remove script tag after injection to keep DOM clean
+};
+(document.head || document.documentElement).appendChild(script);
+} catch (err) {
+console.error('[EXT] Failed to inject script', err);
 }
 
-// reinjeta se o Telegram substituir <head> ou <html>
-const persistentObserver = new MutationObserver(() => {
-  // se o script sumiu -> reinjeta
-  const already = document.querySelector('script[data-injected-by="tg-ext"]');
-  if (!already) {
-    injectNow();
-  }
+
+// Optional: listen for messages from inject.js if you want the service
+// worker (background) to be able to control timers or clear all messages.
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+if (msg && msg.type === 'EXT_LOG') {
+console.log('[EXT background message]', msg.payload);
+sendResponse({ok: true});
+}
+
+
+// keep channel open for async
+return true;
 });
-
-// vigia o documento INTEIRO, incluindo troca completa de html/head
-persistentObserver.observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-});
-
-// INJEÇÃO INICIAL
-injectNow();
-
+})();
